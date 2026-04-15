@@ -1,0 +1,10 @@
+{
+  "contractName": "IDSLogger",
+  "address": "0xE7d07512b2Aeb3595fdC3Aa3aa52f9CC8E01fA1E",
+  "network": {
+    "name": "ganache",
+    "chainId": "1337"
+  },
+  "deployer": "0x20Eb64e07018F00613be012B4Eb0bD3E6C900C36",
+  "deployedAt": "2026-04-15T17:06:24.219Z"
+}
