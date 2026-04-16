@@ -2,24 +2,22 @@ import { useState } from "react";
 import PageHeader from "../components/PageHeader";
 import StatusMessage from "../components/StatusMessage";
 import { runDetection } from "../services/detectionService";
-
-const samplePacket = {
-  "Flow Duration": 1200,
-  "Total Fwd Packets": 8,
-  "Total Backward Packets": 5,
-  "Total Length of Fwd Packets": 480,
-  "Total Length of Bwd Packets": 260,
-  "Flow Bytes/s": 616.6,
-  "Flow Packets/s": 10.8,
-  "SYN Flag Count": 1,
-  "ACK Flag Count": 1
-};
+import { examplePayloads, stringifyPayload } from "../services/examplePayloads";
 
 function Detection() {
-  const [payload, setPayload] = useState(JSON.stringify(samplePacket, null, 2));
+  const [activeExample, setActiveExample] = useState(examplePayloads[0].id);
+  const [payload, setPayload] = useState(stringifyPayload(examplePayloads[0].payload));
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const selectedExample = examplePayloads.find((example) => example.id === activeExample);
+
+  function loadExample(example) {
+    setActiveExample(example.id);
+    setPayload(stringifyPayload(example.payload));
+    setResult(null);
+    setError("");
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -47,27 +45,67 @@ function Detection() {
       <PageHeader
         eyebrow="Manual Analysis"
         title="Detection Console"
-        description="Submit packet or flow JSON. Missing model fields are safely filled with zero so this can evolve for realtime captures."
+        description="Submit packet or flow JSON. Use complete pre-configured examples that match the model feature schema exactly, or edit the payload manually."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <form className="glass-panel rounded-3xl p-6" onSubmit={handleSubmit}>
-          <div className="mb-4 flex items-center justify-between gap-4">
+          <div className="mb-4 flex flex-col gap-4">
             <label className="font-display text-2xl font-bold text-white" htmlFor="packet-json">
               Packet JSON
             </label>
-            <button
-              type="button"
-              onClick={() => setPayload(JSON.stringify(samplePacket, null, 2))}
-              className="rounded-full border border-white/10 px-4 py-2 text-sm font-bold text-emerald-100/70 hover:bg-white/10"
-            >
-              Load Sample
-            </button>
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.26em] text-emerald-100/45">
+                    Example Payloads
+                  </p>
+                  <p className="mt-1 text-sm text-emerald-100/60">
+                    Select a complete feature-aligned scenario, then run detection or adjust values.
+                  </p>
+                </div>
+                <span className="rounded-full bg-signal/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-signal">
+                  Complete schema
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {examplePayloads.map((example) => {
+                  const isActive = activeExample === example.id;
+
+                  return (
+                    <button
+                      key={example.id}
+                      type="button"
+                      onClick={() => loadExample(example)}
+                      className={[
+                        "rounded-2xl border p-4 text-left transition",
+                        isActive
+                          ? "border-signal bg-signal text-obsidian shadow-glow"
+                          : "border-white/10 bg-white/[0.04] text-emerald-50 hover:border-signal/50 hover:bg-white/10"
+                      ].join(" ")}
+                    >
+                      <span className="text-xs font-extrabold uppercase tracking-[0.2em] opacity-70">
+                        {example.badge}
+                      </span>
+                      <span className="mt-2 block font-display text-lg font-bold">{example.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedExample ? (
+                <p className="mt-4 text-sm text-emerald-100/60">{selectedExample.description}</p>
+              ) : null}
+            </div>
           </div>
           <textarea
             id="packet-json"
             value={payload}
-            onChange={(event) => setPayload(event.target.value)}
+            onChange={(event) => {
+              setPayload(event.target.value);
+              setActiveExample("custom");
+            }}
             className="min-h-[420px] w-full rounded-3xl border border-white/10 bg-black/40 p-5 font-mono text-sm text-emerald-50 outline-none transition focus:border-signal"
             spellCheck="false"
           />
