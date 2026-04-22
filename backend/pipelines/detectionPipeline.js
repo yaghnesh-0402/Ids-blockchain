@@ -9,17 +9,28 @@ async function processDetection(inputData, options = {}) {
   const predictionResult = await aiService.runPrediction(featureResult.processedData, {
     modelType: options.modelType
   });
+  const shouldStoreOnBlockchain =
+    typeof options.shouldStoreOnBlockchain === "function"
+      ? options.shouldStoreOnBlockchain(predictionResult)
+      : options.shouldStoreOnBlockchain !== false;
 
   const logRecord = await logService.createLog({
     source,
-    rawData: inputData,
+    rawData: options.rawData || inputData,
     processedData: featureResult.processedData,
     prediction: String(predictionResult.prediction),
     confidence: predictionResult.confidence,
     createdBy: options.userId || null
   });
 
-  const blockchainReceipt = await blockchainService.sendHash(logRecord.hash);
+  const blockchainReceipt = shouldStoreOnBlockchain
+    ? await blockchainService.sendHash(logRecord.hash)
+    : {
+        status: "skipped",
+        network: process.env.BLOCKCHAIN_NETWORK || "local-dev",
+        hash: logRecord.hash,
+        reason: "Prediction did not meet blockchain storage criteria."
+      };
 
   if (blockchainReceipt) {
     logRecord.blockchainReceipt = blockchainReceipt;
@@ -34,6 +45,8 @@ async function processDetection(inputData, options = {}) {
     prediction: predictionResult.prediction,
     confidence: predictionResult.confidence,
     modelType: predictionResult.modelType,
+    votes: predictionResult.votes || null,
+    individualModels: predictionResult.individualModels || null,
     hash: logRecord.hash,
     blockchain: blockchainReceipt,
     logId: logRecord._id

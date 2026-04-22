@@ -5,7 +5,21 @@ import StatusMessage from "../components/StatusMessage";
 import { useLogs } from "../hooks/useLogs";
 
 function isAttack(log) {
-  return !String(log.prediction || "").toLowerCase().includes("benign");
+  const prediction = String(log.prediction ?? "").trim().toLowerCase();
+
+  if (prediction === "1") {
+    return true;
+  }
+
+  if (prediction === "0") {
+    return false;
+  }
+
+  if (prediction.includes("benign") || prediction.includes("normal")) {
+    return false;
+  }
+
+  return Boolean(prediction);
 }
 
 function Dashboard() {

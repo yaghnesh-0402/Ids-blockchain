@@ -4,13 +4,22 @@ import StatusMessage from "../components/StatusMessage";
 import { runDetection } from "../services/detectionService";
 import { examplePayloads, stringifyPayload } from "../services/examplePayloads";
 
+const modelOptions = [
+  { id: "rf", label: "Random Forest", note: "Single-model vote" },
+  { id: "et", label: "Extra Trees", note: "Single-model vote" },
+  { id: "xgb", label: "XGBoost", note: "Single-model vote" },
+  { id: "ensemble", label: "Ensemble", note: "Majority of all 3" }
+];
+
 function Detection() {
   const [activeExample, setActiveExample] = useState(examplePayloads[0].id);
+  const [selectedModel, setSelectedModel] = useState("ensemble");
   const [payload, setPayload] = useState(stringifyPayload(examplePayloads[0].payload));
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const selectedExample = examplePayloads.find((example) => example.id === activeExample);
+  const activeModel = modelOptions.find((model) => model.id === selectedModel);
 
   function loadExample(example) {
     setActiveExample(example.id);
@@ -27,7 +36,7 @@ function Detection() {
 
     try {
       const packetData = JSON.parse(payload);
-      const data = await runDetection(packetData);
+      const data = await runDetection(packetData, selectedModel);
       setResult(data);
     } catch (requestError) {
       if (requestError instanceof SyntaxError) {
@@ -64,12 +73,17 @@ function Detection() {
                     Select a complete feature-aligned scenario, then run detection or adjust values.
                   </p>
                 </div>
-                <span className="rounded-full bg-signal/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-signal">
-                  Complete schema
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-signal/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-signal">
+                    Complete schema
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/70">
+                    {activeModel?.label}
+                  </span>
+                </div>
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 {examplePayloads.map((example) => {
                   const isActive = activeExample === example.id;
 
@@ -99,6 +113,48 @@ function Detection() {
               ) : null}
             </div>
           </div>
+
+          <div className="mb-4 rounded-3xl border border-white/10 bg-black/20 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.26em] text-emerald-100/45">
+                  Detection Model
+                </p>
+                <p className="mt-1 text-sm text-emerald-100/60">
+                  Choose one model directly, or use Ensemble for a majority decision across Random Forest, Extra Trees, and XGBoost.
+                </p>
+              </div>
+              <span className="rounded-full bg-amber/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-amber">
+                {activeModel?.note}
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {modelOptions.map((model) => {
+                const isActive = selectedModel === model.id;
+
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    onClick={() => setSelectedModel(model.id)}
+                    className={[
+                      "rounded-2xl border p-4 text-left transition",
+                      isActive
+                        ? "border-amber bg-amber text-obsidian"
+                        : "border-white/10 bg-white/[0.04] text-emerald-50 hover:border-amber/50 hover:bg-white/10"
+                    ].join(" ")}
+                  >
+                    <span className="block font-display text-lg font-bold">{model.label}</span>
+                    <span className="mt-2 block text-xs font-extrabold uppercase tracking-[0.18em] opacity-70">
+                      {model.note}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <textarea
             id="packet-json"
             value={payload}
@@ -119,7 +175,7 @@ function Detection() {
             disabled={loading}
             className="mt-5 rounded-2xl bg-signal px-6 py-3 font-extrabold text-obsidian shadow-glow transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Running model..." : "Run Detection"}
+            {loading ? `Running ${activeModel?.label || "model"}...` : "Run Detection"}
           </button>
         </form>
 
@@ -149,6 +205,42 @@ function Detection() {
                   <p className="mt-2 text-2xl font-bold uppercase">{result.modelType || "rf"}</p>
                 </div>
               </div>
+              {result.votes ? (
+                <div className="rounded-2xl bg-white/5 p-4">
+                  <p className="text-sm text-emerald-100/50">Ensemble Votes</p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {Object.entries(result.votes).map(([prediction, count]) => (
+                      <span
+                        key={prediction}
+                        className="rounded-full border border-white/10 bg-black/30 px-3 py-2 text-sm font-bold text-emerald-50"
+                      >
+                        Class {prediction}: {count}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {result.individualModels?.length ? (
+                <div className="rounded-2xl bg-white/5 p-4">
+                  <p className="text-sm text-emerald-100/50">Individual Model Decisions</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    {result.individualModels.map((modelResult) => (
+                      <div key={modelResult.modelType} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/45">
+                          {modelResult.modelType}
+                        </p>
+                        <p className="mt-2 text-2xl font-bold text-white">{modelResult.prediction}</p>
+                        <p className="mt-2 text-sm text-emerald-100/60">
+                          Confidence:{" "}
+                          {typeof modelResult.confidence === "number"
+                            ? `${(modelResult.confidence * 100).toFixed(2)}%`
+                            : "N/A"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="rounded-2xl bg-black/30 p-4">
                 <p className="text-sm text-emerald-100/50">Hash</p>
                 <p className="mt-2 break-all font-mono text-xs text-emerald-100/70">{result.hash}</p>
